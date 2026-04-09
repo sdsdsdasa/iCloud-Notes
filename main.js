@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, nativeImage, shell, ipcMain, session } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, shell, ipcMain, session, safeStorage } = require('electron');
 const path = require('path');
 const Store = require('electron-store');
 
@@ -8,8 +8,81 @@ const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
 
 let mainWindow = null;
 let splashWindow = null;
+let settingsWindow = null;
 let tray = null;
 let isQuitting = false;
+
+// ── Credential storage (OS-level encryption via safeStorage) ──────────────────
+
+function saveCredentials(email, password) {
+  if (safeStorage.isEncryptionAvailable()) {
+    store.set('creds.email', safeStorage.encryptString(email).toString('base64'));
+    store.set('creds.password', safeStorage.encryptString(password).toString('base64'));
+  } else {
+    store.set('creds.email', Buffer.from(email).toString('base64'));
+    store.set('creds.password', Buffer.from(password).toString('base64'));
+  }
+}
+
+function loadCredentials() {
+  try {
+    const e = store.get('creds.email');
+    const p = store.get('creds.password');
+    if (!e || !p) return null;
+    if (safeStorage.isEncryptionAvailable()) {
+      return {
+        email: safeStorage.decryptString(Buffer.from(e, 'base64')),
+        password: safeStorage.decryptString(Buffer.from(p, 'base64'))
+      };
+    }
+    return {
+      email: Buffer.from(e, 'base64').toString(),
+      password: Buffer.from(p, 'base64').toString()
+    };
+  } catch {
+    return null;
+  }
+}
+
+ipcMain.handle('save-credentials', (_, { email, password }) => {
+  saveCredentials(email, password);
+  return { ok: true };
+});
+
+ipcMain.handle('load-credentials', () => loadCredentials());
+
+ipcMain.handle('clear-credentials', () => {
+  store.delete('creds.email');
+  store.delete('creds.password');
+  return { ok: true };
+});
+
+// ── Settings window ───────────────────────────────────────────────────────────
+
+function createSettingsWindow() {
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    settingsWindow.focus();
+    return;
+  }
+  settingsWindow = new BrowserWindow({
+    width: 420,
+    height: 300,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    parent: mainWindow,
+    title: 'Auto-Login Settings',
+    icon: getIconPath(),
+    autoHideMenuBar: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      nodeIntegration: false,
+      contextIsolation: true
+    }
+  });
+  settingsWindow.loadFile('settings.html');
+  settingsWindow.on('closed', () => { settingsWindow = null; });
+}
 
 // Prevent multiple instances
 if (!app.requestSingleInstanceLock()) {
@@ -64,7 +137,7 @@ function createMainWindow() {
     show: false,
     title: 'iCloud Notes',
     icon: getIconPath(),
-    autoHideMenuBar: true,
+    autoHideMenuBar: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -125,6 +198,36 @@ function createMainWindow() {
     }
   });
 
+  // Auto-fill Apple ID login when credentials are saved
+  mainWindow.webContents.on('did-finish-load', () => {
+    const url = mainWindow.webContents.getURL();
+    const isAppleAuth = url.includes('apple.com') &&
+      (url.includes('auth') || url.includes('login') || url.includes('account') || url.includes('signin'));
+    if (!isAppleAuth) return;
+    const creds = loadCredentials();
+    if (!creds) return;
+    mainWindow.webContents.executeJavaScript(`
+      (function(email, password) {
+        function fill(el, val) {
+          const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+          setter.call(el, val);
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        const emailEl =
+          document.querySelector('#account_name_text_field') ||
+          document.querySelector('input[name="accountName"]') ||
+          document.querySelector('input[type="email"]');
+        if (emailEl && !emailEl.value) { fill(emailEl, email); return; }
+        const passEl =
+          document.querySelector('#password_text_field') ||
+          document.querySelector('input[name="password"]') ||
+          document.querySelector('input[type="password"]');
+        if (passEl && !passEl.value) fill(passEl, password);
+      })(${JSON.stringify(creds.email)}, ${JSON.stringify(creds.password)});
+    `).catch(() => {});
+  });
+
   // Open external links in the default browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (!url.startsWith('https://www.icloud.com.cn')) {
@@ -158,6 +261,11 @@ function createTray() {
         mainWindow.show();
         mainWindow.focus();
       }
+    },
+    { type: 'separator' },
+    {
+      label: 'Auto-Login Settings',
+      click: () => createSettingsWindow()
     },
     { type: 'separator' },
     {

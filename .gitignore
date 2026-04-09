@@ -1,0 +1,5 @@
+node_modules/
+dist/
+.venv/
+desktop.ini
+*.log

@@ -4,7 +4,7 @@ A small Electron desktop app that opens iCloud Notes in a dedicated Windows app 
 
 ## Features
 
-- Opens `https://www.icloud.com/notes` in an Electron window
+- Opens `https://www.icloud.com.cn/notes` in an Electron window
 - Uses a persistent browser partition so you do not need to log in every time
 - Minimizes to the system tray instead of closing
 - Remembers window size and position

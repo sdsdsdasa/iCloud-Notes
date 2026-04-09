@@ -3,7 +3,7 @@ const path = require('path');
 const Store = require('electron-store');
 
 const store = new Store();
-const ICLOUD_NOTES_URL = 'https://www.icloud.com/notes';
+const ICLOUD_NOTES_URL = 'https://www.icloud.com.cn/notes';
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
 let mainWindow = null;
@@ -127,7 +127,7 @@ function createMainWindow() {
 
   // Open external links in the default browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (!url.startsWith('https://www.icloud.com')) {
+    if (!url.startsWith('https://www.icloud.com.cn')) {
       shell.openExternal(url);
       return { action: 'deny' };
     }

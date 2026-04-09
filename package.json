@@ -41,6 +41,7 @@
       "main.js",
       "preload.js",
       "splash.html",
+      "settings.html",
       "icon.ico",
       "icon.png"
     ]

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Auto-Login Settings</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f5f5f5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+    .card {
+      background: white;
+      border-radius: 10px;
+      padding: 28px 32px;
+      width: 360px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+    }
+    h2 { font-size: 16px; font-weight: 600; color: #1d1d1f; margin-bottom: 20px; }
+    label { display: block; font-size: 12px; color: #666; margin-bottom: 4px; margin-top: 14px; }
+    input {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus { border-color: #0071e3; }
+    .actions { display: flex; gap: 8px; margin-top: 20px; }
+    button {
+      flex: 1;
+      padding: 9px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .btn-save { background: #0071e3; color: white; }
+    .btn-save:hover { background: #0077ed; }
+    .btn-clear { background: #f5f5f5; color: #333; border: 1px solid #ddd; }
+    .btn-clear:hover { background: #ebebeb; }
+    .status { font-size: 12px; text-align: center; margin-top: 12px; min-height: 16px; }
+    .note { font-size: 11px; color: #999; margin-top: 14px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Auto-Login Settings</h2>
+    <label>Apple ID (Email)</label>
+    <input type="email" id="email" placeholder="example@icloud.com" autocomplete="username" />
+    <label>Password</label>
+    <input type="password" id="password" placeholder="Password" autocomplete="current-password" />
+    <div class="actions">
+      <button class="btn-save" onclick="save()">Save</button>
+      <button class="btn-clear" onclick="clearCreds()">Clear</button>
+    </div>
+    <div class="status" id="status"></div>
+    <p class="note">Credentials are encrypted and stored locally on your device using OS-level encryption.</p>
+  </div>
+  <script>
+    const api = window.icloudApp;
+
+    async function load() {
+      const creds = await api.loadCredentials();
+      if (creds) {
+        document.getElementById('email').value = creds.email;
+        document.getElementById('password').value = creds.password;
+      }
+    }
+
+    async function save() {
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      if (!email || !password) { showStatus('Please fill in both fields.', '#ff3b30'); return; }
+      await api.saveCredentials(email, password);
+      showStatus('Saved!', '#34c759');
+    }
+
+    async function clearCreds() {
+      await api.clearCredentials();
+      document.getElementById('email').value = '';
+      document.getElementById('password').value = '';
+      showStatus('Cleared.', '#888');
+    }
+
+    function showStatus(msg, color) {
+      const el = document.getElementById('status');
+      el.style.color = color;
+      el.textContent = msg;
+      setTimeout(() => { el.textContent = ''; }, 2500);
+    }
+
+    load();
+  </script>
+</body>
+</html>

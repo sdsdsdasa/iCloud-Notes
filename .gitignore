@@ -3,3 +3,4 @@ dist/
 .venv/
 desktop.ini
 *.log
+ignore/
